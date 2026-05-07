@@ -1,5 +1,6 @@
 import os
 import difflib
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -20,19 +21,31 @@ from reportlab.platypus import (
 from reportlab.lib.styles import getSampleStyleSheet
 
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
+
+import arabic_reshaper
+from bidi.algorithm import get_display
 
 TOKEN = "8792686474:AAFmWTm7If7pDpHy0_8M3cJT1YvlyO5RZjI"
 
 user_files = {}
 
 
+def arabic_text(text):
+
+    reshaped = arabic_reshaper.reshape(text)
+
+    return get_display(reshaped)
+
+
 def extract_text(pdf_path):
+
     text = ""
 
     reader = PdfReader(pdf_path)
 
     for page in reader.pages:
+
         page_text = page.extract_text()
 
         if page_text:
@@ -44,7 +57,10 @@ def extract_text(pdf_path):
 def create_pdf(diff_lines, output_file):
 
     pdfmetrics.registerFont(
-        UnicodeCIDFont('HYSMyeongJo-Medium')
+        TTFont(
+            'Arabic',
+            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'
+        )
     )
 
     doc = SimpleDocTemplate(output_file)
@@ -53,9 +69,11 @@ def create_pdf(diff_lines, output_file):
 
     elements = []
 
+    title = arabic_text("نتيجة مقارنة ملفات PDF")
+
     elements.append(
         Paragraph(
-            "نتيجة مقارنة ملفات PDF",
+            f"<font name='Arabic'>{title}</font>",
             styles['Title']
         )
     )
@@ -69,15 +87,19 @@ def create_pdf(diff_lines, output_file):
             .replace(">", "&gt;")
         )
 
+        safe_line = arabic_text(safe_line)
+
+        color = "black"
+
         if line.startswith("+"):
-            safe_line = f"<font color='green'>{safe_line}</font>"
+            color = "green"
 
         elif line.startswith("-"):
-            safe_line = f"<font color='red'>{safe_line}</font>"
+            color = "red"
 
         elements.append(
             Paragraph(
-                f"<font name='HYSMyeongJo-Medium'>{safe_line}</font>",
+                f"<font name='Arabic' color='{color}'>{safe_line}</font>",
                 styles['BodyText']
             )
         )
