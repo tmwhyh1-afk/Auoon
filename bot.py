@@ -10,59 +10,88 @@ from telegram.ext import (
 )
 
 from PyPDF2 import PdfReader
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer
+)
+
 from reportlab.lib.styles import getSampleStyleSheet
+
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 TOKEN = "8792686474:AAFmWTm7If7pDpHy0_8M3cJT1YvlyO5RZjI"
 
 user_files = {}
 
-# استخراج النص من PDF
+
 def extract_text(pdf_path):
     text = ""
+
     reader = PdfReader(pdf_path)
 
     for page in reader.pages:
         page_text = page.extract_text()
+
         if page_text:
             text += page_text + "\n"
 
     return text
 
 
-# إنشاء PDF للاختلافات
 def create_pdf(diff_lines, output_file):
+
+    pdfmetrics.registerFont(
+        UnicodeCIDFont('HYSMyeongJo-Medium')
+    )
+
     doc = SimpleDocTemplate(output_file)
+
     styles = getSampleStyleSheet()
+
     elements = []
 
     elements.append(
-        Paragraph("PDF Comparison Result", styles['Title'])
+        Paragraph(
+            "نتيجة مقارنة ملفات PDF",
+            styles['Title']
+        )
     )
 
-    elements.append(Spacer(1, 12))
+    elements.append(Spacer(1, 20))
 
     for line in diff_lines:
+
         safe_line = (
             line.replace("<", "&lt;")
             .replace(">", "&gt;")
         )
 
+        if line.startswith("+"):
+            safe_line = f"<font color='green'>{safe_line}</font>"
+
+        elif line.startswith("-"):
+            safe_line = f"<font color='red'>{safe_line}</font>"
+
         elements.append(
-            Paragraph(safe_line, styles['BodyText'])
+            Paragraph(
+                f"<font name='HYSMyeongJo-Medium'>{safe_line}</font>",
+                styles['BodyText']
+            )
         )
 
     doc.build(elements)
 
 
-# أمر البدء
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
         "ارسل الملف PDF الاول"
     )
 
 
-# استقبال ملفات PDF
 async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.message.from_user.id
@@ -73,7 +102,6 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await file.download_to_drive(file_name)
 
-    # الملف الاول
     if user_id not in user_files:
 
         user_files[user_id] = [file_name]
@@ -82,7 +110,6 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "تم استلام الملف الاول، ارسل الملف الثاني"
         )
 
-    # الملف الثاني
     else:
 
         user_files[user_id].append(file_name)
@@ -116,7 +143,6 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 caption="تم إنشاء ملف الاختلافات"
             )
 
-        # حذف الملفات
         os.remove(pdf1)
         os.remove(pdf2)
         os.remove(output_pdf)
@@ -124,7 +150,6 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del user_files[user_id]
 
 
-# تشغيل البوت
 app = Application.builder().token(TOKEN).build()
 
 app.add_handler(
